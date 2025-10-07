@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Karnaugh Visualizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🧩 Générateur de Diagramme de Karnaugh</h1>
+    <p>Entrez une expression (ex: <code>(AUB)n(CnB)</code>) :</p>
+    <input type="text" id="expression" placeholder="(AUB)n(CnB)" />
+    <button id="generate">Générer</button>
+    <canvas id="kmap" width="600" height="300"></canvas>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
