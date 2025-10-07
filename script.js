@@ -1,5 +1,3 @@
-
-Vous avez dit :
 // ---- script.js version corrigée (gestion complète des barres et des compléments combinés) ----
 
 const grayOrder = [
@@ -46,9 +44,9 @@ function parseExpression(expr) {
 function evalExpr(expr, A, B, C) {
   const jsExpr = parseExpression(expr);
   try {
-    return Function("A", "B", "C", return (${jsExpr});)(A, B, C);
+    return Function("A", "B", "C", `return (${jsExpr});`)(A, B, C);
   } catch (err) {
-    throw new Error(Erreur dans l'expression. Utilisez par ex. (AUB)n(CnB)\n\nDétail: ${err.message}\nExpression JS générée: ${jsExpr});
+    throw new Error(`Erreur dans l'expression. Utilisez par ex. (AUB)n(CnB)\n\nDétail: ${err.message}\nExpression JS générée: ${jsExpr}`);
   }
 }
 
@@ -84,7 +82,7 @@ function drawKMap(expr) {
     ctx.fillRect(px, py, cellW, cellH);
     ctx.strokeRect(px, py, cellW, cellH);
     ctx.fillStyle = "#000";
-    ctx.fillText(A=${grayOrder[i][0]} B=${grayOrder[i][1]} C=${grayOrder[i][2]}, px+cellW/2, py+cellH/2);
+    ctx.fillText(`A=${grayOrder[i][0]} B=${grayOrder[i][1]} C=${grayOrder[i][2]}`, px+cellW/2, py+cellH/2);
   }
 
   ctx.fillStyle = "#222";
