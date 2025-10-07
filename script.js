@@ -1,4 +1,4 @@
-// ---- Définition des combinaisons A,B,C (Gray code pour Karnaugh 3 variables) ----
+// ---- Ordre de Gray pour A,B,C ----
 const grayOrder = [
   [0,0,0],[0,0,1],[0,1,1],[0,1,0],
   [1,1,0],[1,1,1],[1,0,1],[1,0,0]
@@ -7,23 +7,44 @@ const grayOrder = [
 const canvas = document.getElementById("kmap");
 const ctx = canvas.getContext("2d");
 
-function evalExpr(expr, A, B, C) {
-  // Convertir opérateurs de la forme (AUB)n(CnB)
-  let jsExpr = expr.replace(/U/g, "||").replace(/n/g, "&&");
-  jsExpr = jsExpr
-    .replace(/CnB/g, "(C && !B)")
-    .replace(/AUB/g, "(A || B)");
-  return eval(jsExpr);
+// ---- Convertit une expression ensembliste vers une expression JS logique ----
+function parseExpression(expr) {
+  // Nettoyage de base
+  let e = expr.replace(/\s+/g, "");
+  
+  // Gestion du complément : on remplace par 'notX' si besoin
+  // Ex: CnB => (C and not B)
+  e = e.replace(/([ABC])n\(([ABC])\)/g, "($1 and $2)");
+  
+  // Remplacer les opérateurs
+  e = e
+    .replace(/U/g, "||")    // union → OR
+    .replace(/n/g, "&&")    // intersection → AND
+    .replace(/-/g, "&& !"); // différence → A - B = A && !B
+
+  // Remplacer les variables par leur booléen JS
+  e = e.replace(/A/g, "A").replace(/B/g, "B").replace(/C/g, "C");
+  
+  return e;
 }
 
+// ---- Évalue une expression pour une combinaison (A,B,C) ----
+function evalExpr(expr, A, B, C) {
+  const jsExpr = parseExpression(expr);
+  return Function("A", "B", "C", `return (${jsExpr});`)(A, B, C);
+}
+
+// ---- Génère un masque booléen pour toutes les combinaisons ----
 function computeMask(expr) {
   const mask = [];
   for (let [A,B,C] of grayOrder) {
-    mask.push(evalExpr(expr, Boolean(A), Boolean(B), Boolean(C)));
+    const val = evalExpr(expr, Boolean(A), Boolean(B), Boolean(C));
+    mask.push(val ? 1 : 0);
   }
   return mask;
 }
 
+// ---- Dessine la carte de Karnaugh ----
 function drawKMap(expr) {
   const mask = computeMask(expr);
   const cellW = 150, cellH = 150;
@@ -33,7 +54,6 @@ function drawKMap(expr) {
   ];
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   ctx.font = "14px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -63,7 +83,7 @@ document.getElementById("generate").addEventListener("click", () => {
   try {
     drawKMap(expr);
   } catch (e) {
-    alert("Erreur dans l'expression. Utilisez par ex. (AUB)n(CnB)");
+    alert("Erreur dans l'expression : " + e.message);
   }
 });
 
