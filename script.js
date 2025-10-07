@@ -7,34 +7,35 @@ const grayOrder = [
 const canvas = document.getElementById("kmap");
 const ctx = canvas.getContext("2d");
 
-// ---- Convertit une expression ensembliste vers une expression JS logique ----
+// ---- Convertit une expression ensembliste vers JS ----
 function parseExpression(expr) {
-  // Nettoyage de base
-  let e = expr.replace(/\s+/g, "");
-  
-  // Gestion du complément : on remplace par 'notX' si besoin
-  // Ex: CnB => (C and not B)
-  e = e.replace(/([ABC])n\(([ABC])\)/g, "($1 and $2)");
-  
-  // Remplacer les opérateurs
-  e = e
-    .replace(/U/g, "||")    // union → OR
-    .replace(/n/g, "&&")    // intersection → AND
-    .replace(/-/g, "&& !"); // différence → A - B = A && !B
+  let e = expr.replace(/\s+/g, ""); // enlever espaces
 
-  // Remplacer les variables par leur booléen JS
-  e = e.replace(/A/g, "A").replace(/B/g, "B").replace(/C/g, "C");
-  
+  // Gestion des notations de complément (A', Ā, !A, (AUB)')
+  // 1️⃣ Compléments sur variables simples
+  e = e.replace(/A'|Ā|!A/g, "(!A)");
+  e = e.replace(/B'|B̄|!B/g, "(!B)");
+  e = e.replace(/C'|C̄|!C/g, "(!C)");
+
+  // 2️⃣ Complément sur parenthèses ex: (AUB)'
+  e = e.replace(/\(([^()]+)\)'/g, "(!($1))");
+
+  // 3️⃣ Remplacement des opérateurs
+  e = e
+    .replace(/U/g, "||")    // Union → OR
+    .replace(/n/g, "&&")    // Intersection → AND
+    .replace(/-/g, "&& !"); // Différence → A && !B
+
   return e;
 }
 
-// ---- Évalue une expression pour une combinaison (A,B,C) ----
+// ---- Évalue l’expression pour une combinaison A,B,C ----
 function evalExpr(expr, A, B, C) {
   const jsExpr = parseExpression(expr);
   return Function("A", "B", "C", `return (${jsExpr});`)(A, B, C);
 }
 
-// ---- Génère un masque booléen pour toutes les combinaisons ----
+// ---- Génère un masque booléen ----
 function computeMask(expr) {
   const mask = [];
   for (let [A,B,C] of grayOrder) {
@@ -44,7 +45,7 @@ function computeMask(expr) {
   return mask;
 }
 
-// ---- Dessine la carte de Karnaugh ----
+// ---- Dessin de la carte ----
 function drawKMap(expr) {
   const mask = computeMask(expr);
   const cellW = 150, cellH = 150;
@@ -79,7 +80,7 @@ function drawKMap(expr) {
 // ---- Interaction ----
 document.getElementById("generate").addEventListener("click", () => {
   const expr = document.getElementById("expression").value.trim();
-  if (expr === "") return;
+  if (!expr) return;
   try {
     drawKMap(expr);
   } catch (e) {
@@ -89,3 +90,4 @@ document.getElementById("generate").addEventListener("click", () => {
 
 // Valeur par défaut
 drawKMap("(AUB)n(CnB)");
+
