@@ -1,7 +1,7 @@
 const canvas = document.getElementById("kmap");
 const ctx = canvas.getContext("2d");
 
-// Détecte toutes les variables présentes dans l'expression
+// Détecter toutes les variables dans l'expression
 function detectVariables(expr) {
   const vars = [...new Set(expr.toUpperCase().match(/[A-Z]/g))];
   return vars.sort();
@@ -49,9 +49,15 @@ function drawKMap(expr) {
   const mask = combinations.map(c => evalExpr(expr, c, variables) ? 1 : 0);
 
   // Déterminer la taille de la grille
-  let cols, rows;
-  if (n <= 2) { cols = 2 ** n; rows = 1; }
-  else { cols = 2 ** Math.ceil(n / 2); rows = 2 ** Math.floor(n / 2); }
+  let rows, cols;
+  if (n === 1) { cols = 2; rows = 1; }
+  else if (n === 2) { cols = 2; rows = 2; }
+  else if (n === 3) { cols = 4; rows = 2; }  // 8 cases
+  else if (n === 4) { cols = 4; rows = 4; }  // 16 cases
+  else { 
+    cols = Math.pow(2, Math.ceil(n/2)); 
+    rows = Math.pow(2, Math.floor(n/2));
+  }
 
   const cellSize = 100;
   canvas.width = cols * cellSize + 20;
