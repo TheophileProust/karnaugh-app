@@ -1,114 +1,105 @@
+
+Vous avez dit :
+// ---- script.js version corrigée (gestion complète des barres et des compléments combinés) ----
+
+const grayOrder = [
+  [0,0,0],[0,0,1],[0,1,1],[0,1,0],
+  [1,1,0],[1,1,1],[1,0,1],[1,0,0]
+];
+
 const canvas = document.getElementById("kmap");
 const ctx = canvas.getContext("2d");
 
-// Détecter les variables dans l'expression
-function detectVariables(expr) {
-  const vars = [...new Set(expr.toUpperCase().match(/[A-Z]/g))];
-  return vars.sort();
+function parseExpression(expr) {
+  if (!expr) return "";
+  if (typeof expr.normalize === "function") expr = expr.normalize("NFD");
+
+  let e = expr.replace(/\s+/g, "").toUpperCase();
+
+  // (AUB)' ou (AUB)̄  → !(AUB)
+  e = e.replace(/\(([^()]+)\)(?:'|[\u0304\u0305\u00AF])/g, "!($1)");
+
+  // A', B', C', Ā, Ā, etc → !A
+  e = e.replace(/([ABC])(?:'|[\u0304\u0305\u00AF])/g, "!$1");
+
+  // !A → !A (déjà bon)
+  e = e.replace(/!([ABC])/g, "!$1");
+
+  // ---- opérateurs ----
+  e = e.replace(/U/g, "||");   // union
+  e = e.replace(/N/g, "&&");   // intersection (maj)
+  e = e.replace(/n/g, "&&");   // intersection (min)
+  e = e.replace(/-/g, "&& !"); // différence
+
+  // ---- corriger les cas comme A&&!B ou !B sans parenthèses ----
+  // On encapsule les variables isolées dans un booléen explicite
+  e = e.replace(/A/g, "(A)").replace(/B/g, "(B)").replace(/C/g, "(C)");
+
+  // ---- Ajouter des parenthèses manquantes pour ! ----
+  // ! (A) ou ! (B) → déjà correct, sinon on force
+  e = e.replace(/!\(/g, "!("); // éviter !!((A))
+  e = e.replace(/!!/g, "!");   // simplifier double négation
+
+  return e;
 }
 
-// Générer Gray code
-function grayCode(n) {
-  if (n === 0) return [[]];
-  const prev = grayCode(n - 1);
-  const result = [];
-  for (let p of prev) result.push([0, ...p]);
-  for (let p of prev.slice().reverse()) result.push([1, ...p]);
-  return result;
-}
-
-// Parser l'expression en JavaScript
-function parseExpression(expr, variables) {
-  expr = expr.replace(/\s+/g, "").toUpperCase();
-  expr = expr.replace(/\(([^()]+)\)(?:'|[\u0304\u0305\u00AF])/g, "!($1)");
-  expr = expr.replace(/([A-Z])(?:'|[\u0304\u0305\u00AF])/g, "!$1");
-  expr = expr.replace(/U/g, "||").replace(/N/g, "&&").replace(/n/g, "&&").replace(/-/g, "&& !");
-  for (let v of variables) expr = expr.replace(new RegExp(v, "g"), `(${v})`);
-  expr = expr.replace(/!!/g, "!");
-  return expr;
-}
-
-// Évaluer l'expression pour une combinaison de variables
-function evalExpr(expr, combo, variables) {
-  const fn = new Function(...variables, `return (${parseExpression(expr, variables)});`);
-  return fn(...combo.map(v => Boolean(v)));
-}
-
-// Dessiner la K-map
-function drawKMap(expr) {
-  const variables = detectVariables(expr);
-  const n = variables.length;
-
-  if (n !== 3 && n !== 4) {
-    alert("Le script fonctionne uniquement pour 3 ou 4 variables.");
-    return;
+function evalExpr(expr, A, B, C) {
+  const jsExpr = parseExpression(expr);
+  try {
+    return Function("A", "B", "C", return (${jsExpr});)(A, B, C);
+  } catch (err) {
+    throw new Error(Erreur dans l'expression. Utilisez par ex. (AUB)n(CnB)\n\nDétail: ${err.message}\nExpression JS générée: ${jsExpr});
   }
+}
 
-  const combinations = grayCode(n);
-  const mask = combinations.map(c => evalExpr(expr, c, variables) ? 1 : 0);
+function computeMask(expr) {
+  const mask = [];
+  for (let [A,B,C] of grayOrder) {
+    const val = evalExpr(expr, Boolean(A), Boolean(B), Boolean(C));
+    mask.push(val ? 1 : 0);
+  }
+  return mask;
+}
 
-  let rows, cols;
-  if (n === 3) { cols = 4; rows = 2; }    // 2x4 rectangle
-  else if (n === 4) { cols = 4; rows = 4; } // 4x4 carré
+function drawKMap(expr) {
+  const mask = computeMask(expr);
+  const cellW = 150, cellH = 150;
+  const positions = [
+    [0,0],[1,0],[2,0],[3,0],
+    [0,1],[1,1],[2,1],[3,1]
+  ];
 
-  const cellSize = 100;
-  canvas.width = cols * cellSize + 20;
-  canvas.height = rows * cellSize + 60;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.font = "14px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Placement Gray code correct
-  let indices = [];
-  if (n === 3) {
-    const rowGray = grayCode(1);   // 2 rows
-    const colGray = grayCode(2);   // 4 columns
-    for (let r = 0; r < 2; r++) {
-      for (let c = 0; c < 4; c++) {
-        const combo = [rowGray[r][0], ...colGray[c]];
-        const idx = combinations.findIndex(x => x.join("") === combo.join(""));
-        indices.push(idx);
-      }
-    }
-  } else if (n === 4) {
-    const rowGray = grayCode(2);   // AB rows
-    const colGray = grayCode(2);   // CD columns
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        const combo = [...rowGray[r], ...colGray[c]];
-        const idx = combinations.findIndex(x => x.join("") === combo.join(""));
-        indices.push(idx);
-      }
-    }
-  }
-
-  // Dessiner les cellules
-  for (let i = 0; i < indices.length; i++) {
-    const x = (i % cols) * cellSize;
-    const y = Math.floor(i / cols) * cellSize;
-    const val = mask[indices[i]];
-    ctx.fillStyle = val ? "#8df58d" : "#fff";
+  for (let i=0; i<8; i++) {
+    const [x,y] = positions[i];
+    const px = x*cellW, py = y*cellH;
+    const color = mask[i] ? "#8df58d" : "#fff";
+    ctx.fillStyle = color;
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 2;
-    ctx.fillRect(x, y, cellSize, cellSize);
-    ctx.strokeRect(x, y, cellSize, cellSize);
-
-    const text = variables.map((v, idx) => `${v}=${combinations[indices[i]][idx]}`).join(" ");
+    ctx.fillRect(px, py, cellW, cellH);
+    ctx.strokeRect(px, py, cellW, cellH);
     ctx.fillStyle = "#000";
-    ctx.fillText(text, x + cellSize / 2, y + cellSize / 2);
+    ctx.fillText(A=${grayOrder[i][0]} B=${grayOrder[i][1]} C=${grayOrder[i][2]}, px+cellW/2, py+cellH/2);
   }
 
   ctx.fillStyle = "#222";
   ctx.font = "18px sans-serif";
-  ctx.fillText(expr, canvas.width / 2, canvas.height - 20);
+  ctx.fillText(expr, canvas.width/2, canvas.height - 20);
 }
 
-// Bouton pour générer le K-map
 document.getElementById("generate").addEventListener("click", () => {
   const expr = document.getElementById("expression").value.trim();
   if (!expr) return;
-  try { drawKMap(expr); } catch (e) { alert(e.message); }
+  try {
+    drawKMap(expr);
+  } catch (e) {
+    alert(e.message);
+  }
 });
 
 // Valeur par défaut
