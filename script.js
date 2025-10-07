@@ -1,10 +1,7 @@
-// ---------------- Variables ----------------
 const canvas = document.getElementById("kmap");
 const ctx = canvas.getContext("2d");
 
-// ---------------- Helpers ----------------
-
-// Génère le Gray code pour n bits
+// ---------------- Gray code ----------------
 function grayCode(n) {
   if (n === 0) return [[]];
   const prev = grayCode(n - 1);
@@ -14,36 +11,30 @@ function grayCode(n) {
   ];
 }
 
-// Détecte les variables présentes dans l'expression (A,B,C,D)
+// ---------------- Détection variables ----------------
 function detectVariables(expr) {
   const vars = new Set(expr.toUpperCase().match(/[A-D]/g));
-  return Array.from(vars).sort(); // ordre alphabétique
+  return Array.from(vars).sort();
 }
 
-// Parse expression en JS
+// ---------------- Parse expression ----------------
 function parseExpression(expr, variables) {
   if (!expr) return "";
   let e = expr.replace(/\s+/g, "").toUpperCase();
 
-  // Négation ' ou ! → !
   e = e.replace(/([A-D])('|!|[\u0304\u0305\u00AF])/g, "!$1");
-
-  // Opérateurs
   e = e.replace(/U/g, "||").replace(/[Nn]/g, "&&").replace(/-/g, "&& !");
 
-  // Encapsuler les variables isolées dans ()
   variables.forEach(v => {
     const regex = new RegExp(`(?<![!()])${v}(?![A-Z])`, "g");
     e = e.replace(regex, `(${v})`);
   });
 
-  // Simplifier double négation
   e = e.replace(/!!/g, "");
-
   return e;
 }
 
-// Évalue l'expression pour une combinaison donnée
+// ---------------- Évaluation ----------------
 function evalExpr(expr, values, variables) {
   const jsExpr = parseExpression(expr, variables);
   try {
@@ -53,15 +44,57 @@ function evalExpr(expr, values, variables) {
   }
 }
 
-// Génère un masque 1/0 pour toutes les combinaisons
+// ---------------- Masque ----------------
 function computeMask(expr, variables) {
   const n = variables.length;
   const combinations = grayCode(n);
   return combinations.map(comb => evalExpr(expr, comb.map(Boolean), variables) ? 1 : 0);
 }
 
-// ---------------- Dessin ----------------
+// ---------------- Détection des groupes minimaux ----------------
+function findGroups(mask, rows, cols) {
+  // Retourne une liste de rectangles [x, y, w, h]
+  const grid = [];
+  let idx = 0;
+  for (let r = 0; r < rows; r++) {
+    grid[r] = [];
+    for (let c = 0; c < cols; c++) {
+      grid[r][c] = mask[idx++] || 0;
+    }
+  }
 
+  const groups = [];
+  const visited = Array.from({length: rows}, ()=>Array(cols).fill(false));
+
+  // On cherche d’abord les grands rectangles (4,2,1)
+  const sizes = [4,2,1];
+
+  sizes.forEach(size => {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (grid[r][c] === 1 && !visited[r][c]) {
+          // vérifier si on peut créer un rectangle de cette taille
+          let w = Math.min(size, cols-c);
+          let h = Math.min(size, rows-r);
+          let valid = true;
+          for (let i = 0; i < h && valid; i++) {
+            for (let j = 0; j < w && valid; j++) {
+              if (grid[(r+i)%rows][(c+j)%cols] !== 1) valid = false;
+            }
+          }
+          if (valid) {
+            groups.push([c,r,w,h]);
+            for (let i=0;i<h;i++) for (let j=0;j<w;j++) visited[(r+i)%rows][(c+j)%cols]=true;
+          }
+        }
+      }
+    }
+  });
+
+  return groups;
+}
+
+// ---------------- Dessin K-map ----------------
 function drawKMap(expr) {
   const variables = detectVariables(expr);
   const n = variables.length;
@@ -72,7 +105,7 @@ function drawKMap(expr) {
   }
 
   const mask = computeMask(expr, variables);
-  const size = 100; // taille de cellule
+  const size = 100;
   const cols = 2 ** Math.ceil(n/2);
   const rows = 2 ** Math.floor(n/2);
 
@@ -84,10 +117,10 @@ function drawKMap(expr) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  // Positions Gray code
   const positions = [];
   const gray = grayCode(n);
   gray.forEach((vals, i) => {
-    // Map vers 2D : colonnes = moitié des bits, lignes = reste
     const colBits = vals.slice(0, Math.ceil(n/2));
     const rowBits = vals.slice(Math.ceil(n/2));
     const x = parseInt(colBits.join(''), 2);
@@ -95,6 +128,7 @@ function drawKMap(expr) {
     positions.push([x,y]);
   });
 
+  // Dessin cellules
   for (let i=0; i<mask.length; i++) {
     const [x,y] = positions[i];
     const px = x*size;
@@ -109,6 +143,14 @@ function drawKMap(expr) {
     ctx.fillStyle = "#000";
     ctx.fillText(text, px + size/2, py + size/2);
   }
+
+  // Détection et dessin des groupes
+  const groups = findGroups(mask, rows, cols);
+  ctx.strokeStyle = "#FF0000";
+  ctx.lineWidth = 4;
+  groups.forEach(([c,r,w,h]) => {
+    ctx.strokeRect(c*size, r*size, w*size, h*size);
+  });
 
   ctx.fillStyle = "#222";
   ctx.font = "18px sans-serif";
@@ -125,5 +167,6 @@ document.getElementById("generate").addEventListener("click", () => {
 
 // Valeur par défaut
 drawKMap("(AUB)n(CnB)");
+
 
 
