@@ -1,23 +1,27 @@
 const canvas = document.getElementById("kmap");
 const ctx = canvas.getContext("2d");
 
-// Détecter toutes les variables dans l'expression
+// Détecte toutes les variables présentes dans l'expression
 function detectVariables(expr) {
   const vars = [...new Set(expr.toUpperCase().match(/[A-Z]/g))];
-  return vars.sort(); // tri alphabétique
+  return vars.sort();
 }
 
-// Générer Gray code pour n bits
-function generateGray(n) {
-  if (n === 0) return [[]];
-  const prev = generateGray(n-1);
+// Générer toutes les combinaisons binaires de n bits
+function generateCombinations(n) {
   const result = [];
-  for (let p of prev) result.push([0, ...p]);
-  for (let p of prev.slice().reverse()) result.push([1, ...p]);
+  const total = 1 << n; // 2^n
+  for (let i = 0; i < total; i++) {
+    const combo = [];
+    for (let j = n - 1; j >= 0; j--) {
+      combo.push((i >> j) & 1);
+    }
+    result.push(combo);
+  }
   return result;
 }
 
-// Parser expression pour JS
+// Convertir l'expression en JavaScript
 function parseExpression(expr, variables) {
   expr = expr.replace(/\s+/g, "").toUpperCase();
   expr = expr.replace(/\(([^()]+)\)(?:'|[\u0304\u0305\u00AF])/g, "!($1)");
@@ -29,30 +33,27 @@ function parseExpression(expr, variables) {
 }
 
 // Évaluer l'expression pour une combinaison
-function evalExpr(expr, values, variables) {
+function evalExpr(expr, combo, variables) {
   const jsExpr = parseExpression(expr, variables);
   const fn = new Function(...variables, `return (${jsExpr});`);
-  return fn(...values.map(v => Boolean(v)));
-}
-
-// Calculer le masque de vérité
-function computeMask(expr, variables) {
-  const n = variables.length;
-  const grayOrder = generateGray(n);
-  const mask = grayOrder.map(combo => evalExpr(expr, combo, variables) ? 1 : 0);
-  return { mask, grayOrder };
+  return fn(...combo.map(v => Boolean(v)));
 }
 
 // Dessiner la K-map
 function drawKMap(expr) {
   const variables = detectVariables(expr);
   const n = variables.length;
-  const { mask, grayOrder } = computeMask(expr, variables);
+  if (n === 0) return alert("Aucune variable détectée");
+
+  const combinations = generateCombinations(n);
+  const mask = combinations.map(c => evalExpr(expr, c, variables) ? 1 : 0);
+
+  // Déterminer la taille de la grille
+  let cols, rows;
+  if (n <= 2) { cols = 2 ** n; rows = 1; }
+  else { cols = 2 ** Math.ceil(n / 2); rows = 2 ** Math.floor(n / 2); }
 
   const cellSize = 100;
-  const cols = 2 ** Math.ceil(n / 2);
-  const rows = Math.ceil(mask.length / cols);
-
   canvas.width = cols * cellSize + 20;
   canvas.height = rows * cellSize + 60;
 
@@ -61,6 +62,7 @@ function drawKMap(expr) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  // Dessiner chaque cellule
   for (let i = 0; i < mask.length; i++) {
     const x = (i % cols) * cellSize;
     const y = Math.floor(i / cols) * cellSize;
@@ -70,7 +72,7 @@ function drawKMap(expr) {
     ctx.fillRect(x, y, cellSize, cellSize);
     ctx.strokeRect(x, y, cellSize, cellSize);
 
-    const text = variables.map((v, idx) => `${v}=${grayOrder[i][idx]}`).join(" ");
+    const text = variables.map((v, idx) => `${v}=${combinations[i][idx]}`).join(" ");
     ctx.fillStyle = "#000";
     ctx.fillText(text, x + cellSize / 2, y + cellSize / 2);
   }
@@ -80,12 +82,13 @@ function drawKMap(expr) {
   ctx.fillText(expr, canvas.width / 2, canvas.height - 20);
 }
 
-// Gestion de l'input utilisateur
+// Gestion du bouton
 document.getElementById("generate").addEventListener("click", () => {
   const expr = document.getElementById("expression").value.trim();
   if (!expr) return;
   try { drawKMap(expr); } catch (e) { alert(e.message); }
 });
 
-// Valeur par défaut
+// Exemple par défaut
 drawKMap("(AUB)n(CnB)");
+
