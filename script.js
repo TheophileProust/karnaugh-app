@@ -10,106 +10,106 @@ function detectVariables(expr) {
 // Générer Gray code
 function grayCode(n) {
   if (n === 0) return [[]];
-  const prev = grayCode(n-1);
+  const prev = grayCode(n - 1);
   const result = [];
-  for (let p of prev) result.push([0,...p]);
-  for (let p of prev.slice().reverse()) result.push([1,...p]);
+  for (let p of prev) result.push([0, ...p]);
+  for (let p of prev.slice().reverse()) result.push([1, ...p]);
   return result;
 }
 
-// Parser l'expression
+// Parser l'expression en JavaScript
 function parseExpression(expr, variables) {
-  expr = expr.replace(/\s+/g,"").toUpperCase();
-  expr = expr.replace(/\(([^()]+)\)(?:'|[\u0304\u0305\u00AF])/g,"!($1)");
-  expr = expr.replace(/([A-Z])(?:'|[\u0304\u0305\u00AF])/g,"!$1");
-  expr = expr.replace(/U/g,"||").replace(/N/g,"&&").replace(/n/g,"&&").replace(/-/g,"&& !");
-  for(let v of variables) expr = expr.replace(new RegExp(v,"g"),`(${v})`);
-  expr = expr.replace(/!!/g,"!");
+  expr = expr.replace(/\s+/g, "").toUpperCase();
+  expr = expr.replace(/\(([^()]+)\)(?:'|[\u0304\u0305\u00AF])/g, "!($1)");
+  expr = expr.replace(/([A-Z])(?:'|[\u0304\u0305\u00AF])/g, "!$1");
+  expr = expr.replace(/U/g, "||").replace(/N/g, "&&").replace(/n/g, "&&").replace(/-/g, "&& !");
+  for (let v of variables) expr = expr.replace(new RegExp(v, "g"), `(${v})`);
+  expr = expr.replace(/!!/g, "!");
   return expr;
 }
 
-// Évaluer l'expression
-function evalExpr(expr, combo, variables){
-  const fn = new Function(...variables, `return (${parseExpression(expr,variables)});`);
-  return fn(...combo.map(v=>Boolean(v)));
+// Évaluer l'expression pour une combinaison de variables
+function evalExpr(expr, combo, variables) {
+  const fn = new Function(...variables, `return (${parseExpression(expr, variables)});`);
+  return fn(...combo.map(v => Boolean(v)));
 }
 
 // Dessiner la K-map
-function drawKMap(expr){
+function drawKMap(expr) {
   const variables = detectVariables(expr);
   const n = variables.length;
 
-  if(n!==3 && n!==4) {
-    alert("Le code fonctionne uniquement pour 3 ou 4 variables.");
+  if (n !== 3 && n !== 4) {
+    alert("Le script fonctionne uniquement pour 3 ou 4 variables.");
     return;
   }
 
   const combinations = grayCode(n);
-  const mask = combinations.map(c => evalExpr(expr, c, variables)?1:0);
+  const mask = combinations.map(c => evalExpr(expr, c, variables) ? 1 : 0);
 
   let rows, cols;
-  if(n===3){ cols=4; rows=2; } // 2x4 rectangle
-  else if(n===4){ cols=4; rows=4; } // 4x4 carré
+  if (n === 3) { cols = 4; rows = 2; }    // 2x4 rectangle
+  else if (n === 4) { cols = 4; rows = 4; } // 4x4 carré
 
   const cellSize = 100;
-  canvas.width = cols*cellSize + 20;
-  canvas.height = rows*cellSize + 60;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.font="14px sans-serif";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
+  canvas.width = cols * cellSize + 20;
+  canvas.height = rows * cellSize + 60;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = "14px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
   // Placement Gray code correct
   let indices = [];
-  if(n===3){
+  if (n === 3) {
     const rowGray = grayCode(1);   // 2 rows
     const colGray = grayCode(2);   // 4 columns
-    for(let r=0;r<2;r++){
-      for(let c=0;c<4;c++){
-        const combo=[rowGray[r][0], ...colGray[c]];
-        const idx=combinations.findIndex(x=>x.join("")===combo.join(""));
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 4; c++) {
+        const combo = [rowGray[r][0], ...colGray[c]];
+        const idx = combinations.findIndex(x => x.join("") === combo.join(""));
         indices.push(idx);
       }
     }
-  } else if(n===4){
+  } else if (n === 4) {
     const rowGray = grayCode(2);   // AB rows
     const colGray = grayCode(2);   // CD columns
-    for(let r=0;r<4;r++){
-      for(let c=0;c<4;c++){
-        const combo=[...rowGray[r], ...colGray[c]];
-        const idx=combinations.findIndex(x=>x.join("")===combo.join(""));
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const combo = [...rowGray[r], ...colGray[c]];
+        const idx = combinations.findIndex(x => x.join("") === combo.join(""));
         indices.push(idx);
       }
     }
   }
 
   // Dessiner les cellules
-  for(let i=0;i<indices.length;i++){
-    const x=(i%cols)*cellSize;
-    const y=Math.floor(i/cols)*cellSize;
+  for (let i = 0; i < indices.length; i++) {
+    const x = (i % cols) * cellSize;
+    const y = Math.floor(i / cols) * cellSize;
     const val = mask[indices[i]];
-    ctx.fillStyle=val?"#8df58d":"#fff";
-    ctx.strokeStyle="#000";
-    ctx.lineWidth=2;
-    ctx.fillRect(x,y,cellSize,cellSize);
-    ctx.strokeRect(x,y,cellSize,cellSize);
+    ctx.fillStyle = val ? "#8df58d" : "#fff";
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, cellSize, cellSize);
+    ctx.strokeRect(x, y, cellSize, cellSize);
 
-    const text = variables.map((v,idx)=>`${v}=${combinations[indices[i]][idx]}`).join(" ");
-    ctx.fillStyle="#000";
-    ctx.fillText(text,x+cellSize/2,y+cellSize/2);
+    const text = variables.map((v, idx) => `${v}=${combinations[indices[i]][idx]}`).join(" ");
+    ctx.fillStyle = "#000";
+    ctx.fillText(text, x + cellSize / 2, y + cellSize / 2);
   }
 
-  ctx.fillStyle="#222";
-  ctx.font="18px sans-serif";
-  ctx.fillText(expr,canvas.width/2,canvas.height-20);
+  ctx.fillStyle = "#222";
+  ctx.font = "18px sans-serif";
+  ctx.fillText(expr, canvas.width / 2, canvas.height - 20);
 }
 
-// Gestion du bouton
-document.getElementById("generate").addEventListener("click",()=>{
-  const expr=document.getElementById("expression").value.trim();
-  if(!expr) return;
-  try{ drawKMap(expr); } catch(e){ alert(e.message); }
+// Bouton pour générer le K-map
+document.getElementById("generate").addEventListener("click", () => {
+  const expr = document.getElementById("expression").value.trim();
+  if (!expr) return;
+  try { drawKMap(expr); } catch (e) { alert(e.message); }
 });
 
-// Exemple par défaut
+// Valeur par défaut
 drawKMap("(AUB)n(CnB)");
