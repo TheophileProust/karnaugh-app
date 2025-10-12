@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Générateur de Diagrammes de Venn</title>
+  <style>
+    :root{
+      --bg: #f4f5f7;
+      --card: #fff;
+      --accent: #4CAF50;
+      --muted: #666;
+    }
+    body{
+      margin:0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      padding:40px 12px;
+      color:#222;
+    }
+    .container{
+      width: 950px;
+      max-width: calc(100% - 24px);
+      background: var(--card);
+      border-radius:12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      padding: 22px;
+    }
+    h1{ margin:0 0 8px 0; font-size:1.25rem; }
+    p.lead{ margin:0 0 14px 0; color:var(--muted); }
+    .controls{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:14px;
+    }
+    input[type="text"]{
+      padding:8px 10px;
+      font-size:1rem;
+      border-radius:8px;
+      border:1px solid #ddd;
+      width:420px;
+    }
+    button{
+      padding:9px 14px;
+      border-radius:8px;
+      border: none;
+      cursor:pointer;
+      background:var(--accent);
+      color:white;
+      font-weight:600;
+    }
+    button.secondary{
+      background:#555;
+    }
+    .row{
+      display:flex;
+      gap:18px;
+      align-items:flex-start;
+    }
+    canvas{
+      background: #fff;
+      border-radius:8px;
+      border:1px solid #ddd;
+    }
+    .info{
+      width:350px;
+      min-width:220px;
+      color:var(--muted);
+      font-size:0.95rem;
+    }
+    .regions-list{
+      margin-top:12px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .region-item{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      padding:6px 8px;
+      border-radius:6px;
+      background:#fafafa;
+      border:1px solid #f0f0f0;
+    }
+    .dot{
+      width:12px;height:12px;border-radius:50%;
+      background:#ddd; display:inline-block;
+    }
+    .dot.on{ background:#8df58d; border:1px solid #6fc86f; box-shadow: 0 0 6px rgba(111,200,111,0.3); }
+    .back {
+      display:inline-block;
+      margin-top:12px;
+      text-decoration:none;
+      color:#fff;
+      background:#444;
+      padding:8px 12px;
+      border-radius:8px;
+    }
+    footer{ margin-top:14px;color:#888;font-size:0.9rem; }
+    @media (max-width:920px){
+      .row{ flex-direction:column; }
+      .info{ width:100%; }
+      input[type="text"]{ width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🟢 Générateur de Diagrammes de Venn</h1>
+    <p class="lead">Entrez une expression avec <strong>A, B, C</strong> (2 ou 3 ensembles), opérateurs <strong>U</strong> (union), <strong>n</strong> (intersection), <strong>-</strong> (différence), et négation <strong>!</strong> ou <strong>'</strong>.</p>
+
+    <div class="controls">
+      <input id="expression" placeholder="Ex : (AUB)nC  — ou  A n (B' U C)  —  A - B" value="(AUB)nC">
+      <button id="draw">Afficher</button>
+      <button id="example2" class="secondary">Exemple 2 sets</button>
+      <button id="example3" class="secondary">Exemple 3 sets</button>
+      <a class="back" href="index.html">⬅ Retour</a>
+    </div>
+
+    <div class="row">
+      <canvas id="venn" width="620" height="420"></canvas>
+
+      <div class="info">
+        <strong>Régions évaluées</strong>
+        <div style="margin-top:8px; color:var(--muted);">
+          Chaque petite pastille verte indique une région du diagramme (par exemple A∩B∩C, A∩¬B∩C, etc.) satisfaite par l'expression.
+        </div>
+
+        <div id="regions" class="regions-list"></div>
+        <footer>Outil simple — visualisation et repérage des régions. Pour remplissage exact des zones, je peux ajouter un rendu SVG détaillé sur demande.</footer>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------- Utils & parsing (A,B,C) ---------- */
+const canvas = document.getElementById('venn');
+const ctx = canvas.getContext('2d');
+
+function parseExpression(expr, variables){
+  if(!expr) return "";
+  let e = expr.replace(/\s+/g,'').toUpperCase();
+  // transform complements A' or Ā or !A -> !A
+  e = e.replace(/([A-C])('|!|[\u0304\u0305\u00AF])/g, '!$1');
+  // operators
+  e = e.replace(/U/g, '||').replace(/[Nn]/g,'&&').replace(/-/g,'&& !');
+  // wrap variables like A -> (A)
+  variables.forEach(v=>{
+    const re = new RegExp(`(?<![!()])${v}(?![A-Z])`, 'g');
+    e = e.replace(re, `(${v})`);
+  });
+  // simplify double !
+  e = e.replace(/!!/g,'');
+  return e;
+}
+
+function detectVariables(expr){
+  const found = expr.toUpperCase().match(/[A-C]/g) || [];
+  const vars = Array.from(new Set(found)).sort();
+  // if user typed only A and B -> return A,B; if none, default to A,B,C
+  if(vars.length === 0) return ['A','B','C'];
+  // ensure at least 2 variables; prefer 2 or 3
+  if(vars.length === 1) return vars.concat(['B','C']).slice(0,2); // fallback to 2 variables
+  return vars;
+}
+
+function evalExpr(expr, values, variables){
+  const js = parseExpression(expr, variables);
+  try{
+    return Function(...variables, `return (${js});`)(...values);
+  }catch(err){
+    throw new Error('Erreur expression: ' + err.message + '\\nExpr JS: ' + js);
+  }
+}
+
+/* ---------- Region positions for labeling ---------- */
+/* We'll draw circle outlines and place small markers (dots + labels) inside each region.
+   For 2 sets there are 4 regions, for 3 sets 8 regions. Coordinates chosen to sit inside
+   each region for the typical equal-overlap Venn layout. */
+
+function getLayout(n){
+  // define circle centers and radius
+  const W = canvas.width, H = canvas.height;
+  if(n === 2){
+    const r = Math.min(W, H) * 0.28;
+    const c1 = {x: W*0.35, y: H*0.5, r};
+    const c2 = {x: W*0.65, y: H*0.5, r};
+    // region centers for bits [A,B] in order 00,01,11,10 (we'll map in code)
+    const regionCenters = {
+      '00': {x: W*0.14, y: H*0.5}, // outside both (unused usually)
+      '10': {x: c1.x - r*0.45, y: c1.y}, // A only
+      '11': {x: W*0.5, y: H*0.5}, // A∩B
+      '01': {x: c2.x + r*0.45, y: c2.y} // B only
+    };
+    return {circles:[c1,c2], centers:regionCenters, n};
+  } else {
+    // n===3
+    const r = Math.min(W, H) * 0.225;
+    const cx = W*0.5, cy = H*0.48;
+    const dx = r * 0.9;
+    const cA = {x: cx - dx, y: cy - r*0.12, r};
+    const cB = {x: cx + dx, y: cy - r*0.12, r};
+    const cC = {x: cx, y: cy + r*0.9, r};
+    // approximate region centers for each 3-bit key "ABC" (A,B,C are 0/1)
+    // We'll place them manually so labels lie inside each small region.
+    const centers = {
+      '000': {x: cx - r*2, y: cy - r*1.6}, // outside all
+      '100': {x: cA.x - r*0.45, y: cA.y - r*0.05}, // A only
+      '010': {x: cB.x + r*0.45, y: cB.y - r*0.05}, // B only
+      '001': {x: cC.x, y: cC.y + r*0.65}, // C only (bottom)
+      '110': {x: (cA.x + cB.x)/2 + 0.05*r, y: cA.y - r*0.06}, // A∩B (top overlap)
+      '101': {x: (cA.x + cC.x)/2 - r*0.12, y: (cA.y + cC.y)/2 + r*0.1}, // A∩C (left-middle)
+      '011': {x: (cB.x + cC.x)/2 + r*0.12, y: (cB.y + cC.y)/2 + r*0.1}, // B∩C (right-middle)
+      '111': {x: cx, y: cy + r*0.08} // A∩B∩C center
+    };
+    return {circles:[cA,cB,cC], centers, n};
+  }
+}
+
+/* ---------- Draw function ---------- */
+function drawVenn(expr){
+  // detect variables (use order A,B,C if present)
+  const varsFound = detectVariables(expr);
+  let variables;
+  if(varsFound.length === 2) variables = varsFound; // A,B
+  else variables = ['A','B','C']; // default 3 variable layout
+  // if user included only A and B, we'll draw 2-set layout
+  const n = variables.length === 2 ? 2 : 3;
+
+  const layout = getLayout(n);
+  // compute mask for all regions (list order we'll present below)
+  const regionKeys = n===2 ? ['00','10','11','01'] : ['000','100','010','001','110','101','011','111'];
+  let mask = [];
+
+  // For each region key compute boolean by mapping bits -> variable values
+  regionKeys.forEach(key=>{
+    const bits = key.split('').map(ch => Boolean(Number(ch)));
+    // create values array matching variables order A,B,C (if only 2 vars, assume A,B)
+    let values;
+    if(n===2){
+      // bits are [A,B] for keys above
+      values = bits;
+    } else {
+      // bits are [A,B,C]
+      values = bits;
+    }
+    // evaluate expression: note variables array must match order (we choose A,B,C)
+    const evalVars = n===2 ? variables : ['A','B','C'];
+    // If expression doesn't contain a variable, eval will receive values in correct positions.
+    try{
+      const val = evalExpr(expr, values, evalVars);
+      mask.push(val ? 1 : 0);
+    }catch(err){
+      alert(err.message);
+      throw err;
+    }
+  });
+
+  // clear canvas
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // draw circles outlines with light fills for reference
+  const colors = ['rgba(255,160,160,0.24)', 'rgba(160,160,255,0.22)', 'rgba(255,230,160,0.22)'];
+  layout.circles.forEach((c, i)=>{
+    ctx.beginPath();
+    ctx.fillStyle = colors[i] || 'rgba(180,180,180,0.15)';
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 2;
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // draw region markers and labels
+  const regionContainer = document.getElementById('regions');
+  regionContainer.innerHTML = ''; // reset list
+
+  regionKeys.forEach((key, idx)=>{
+    const center = layout.centers[key];
+    // skip if unknown center
+    if(!center) return;
+    // Draw a small marker: if mask[idx] true -> green dot, else grey dot
+    const on = Boolean(mask[idx]);
+    ctx.beginPath();
+    ctx.fillStyle = on ? '#8df58d' : '#ddd';
+    ctx.strokeStyle = on ? '#6fc86f' : '#bbb';
+    ctx.lineWidth = 1;
+    ctx.arc(center.x, center.y, 14, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+
+    // label text for the region: show vars state, e.g. A=1 B=0 C=1
+    let label;
+    if(n===2){
+      // map order '00','10','11','01' -> produce text like A=1 B=0
+      const bits = key.split('');
+      label = variables.map((v, i) => `${v}=${bits[i]}`).join(' ');
+    } else {
+      const bits = key.split('');
+      label = ['A','B','C'].map((v,i) => `${v}=${bits[i]}`).join(' ');
+    }
+    ctx.fillStyle = '#111';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, center.x, center.y);
+
+    // add to side list
+    const item = document.createElement('div');
+    item.className = 'region-item';
+    const txt = document.createElement('div');
+    txt.textContent = (n===2 ? 'Reg.' : 'Reg.') + ' ' + key + ' — ' + label;
+    const dot = document.createElement('span');
+    dot.className = 'dot' + (on ? ' on' : '');
+    item.appendChild(txt);
+    item.appendChild(dot);
+    regionContainer.appendChild(item);
+  });
+
+  // show expression text under canvas
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#222';
+  ctx.textAlign = 'center';
+  ctx.fillText(expr, canvas.width/2, canvas.height - 10);
+}
+
+/* ---------- UI handlers ---------- */
+document.getElementById('draw').addEventListener('click', ()=>{
+  const expr = document.getElementById('expression').value.trim();
+  if(!expr) return;
+  drawVenn(expr);
+});
+document.getElementById('example2').addEventListener('click', ()=>{
+  document.getElementById('expression').value = 'A U B';
+  drawVenn('A U B');
+});
+document.getElementById('example3').addEventListener('click', ()=>{
+  document.getElementById('expression').value = '(A n B) U C';
+  drawVenn('(A n B) U C');
+});
+
+// initial draw
+drawVenn('(AUB)nC');
+</script>
+</body>
+</html>
