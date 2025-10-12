@@ -1,24 +1,83 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="description" content="Générez vos diagrammes de Karnaugh pour 3, 4 ou 5 variables et simplifiez vos expressions booléennes facilement en ligne.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mes Projets - Accueil</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #ece9e6, #ffffff);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Générateur de Diagramme de Karnaugh en Ligne - Simplification Booléenne</title>
+    .container {
+      text-align: center;
+      background: white;
+      padding: 3rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(0,0,0,0.1);
+      max-width: 600px;
+      width: 90%;
+    }
 
-<link rel="stylesheet" href="style.css">
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+
+    p {
+      color: #555;
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+    }
+
+    .projects {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .btn {
+      padding: 0.8rem 1.5rem;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    .btn:hover {
+      background: #43a047;
+      transform: scale(1.05);
+    }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #777;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
-    <h1>🧩 Générateur de Diagramme de Karnaugh</h1>
-    <p>Entrez une expression avec A, B, C, D (3 à 4 variables), U (union), n (intersection), - (différence), ! ou '</p>
-    <input type="text" id="expression" placeholder="Ex: (AUB)n(CnD)" />
-    <button id="generate">Générer</button>
-    <canvas id="kmap" width="800" height="400"></canvas>
+    <h1>🧠 Mes Outils & Projets</h1>
+    <p>Bienvenue sur ma page d’accueil ! Retrouvez ici mes projets interactifs et outils de logique, mathématiques et informatique.</p>
+
+    <div class="projects">
+      <a href="karnaugh.html" class="btn">🧩 Outil : Générateur de diagrammes de Karnaugh</a>
+    </div>
+
+    <footer>© 2025 - Créé par [Ton Nom]</footer>
   </div>
-  <script src="script.js"></script>
 </body>
 </html>
-
-
